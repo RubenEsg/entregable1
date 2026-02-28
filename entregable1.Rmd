@@ -1,0 +1,295 @@
+---
+title: "Entregable 1"
+output:
+  html_document: default
+  pdf_document: default
+date: "2026-02-28"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(corrplot)
+library(sf)
+library(patchwork)
+```
+
+```{r load_data}
+# Definimos la ruta de tu carpeta
+ruta_carpeta <- "D:/Descargas/datos/"
+
+# Función para leer con la ruta completa
+read_nasa_data <- function(file_name, var_name) {
+  # Combinamos la ruta con el nombre del archivo
+  path <- paste0(ruta_carpeta, file_name)
+  
+  df <- read_csv(path)
+  
+  df <- df %>% 
+    select(YEAR, LAT, LON, JAN:DEC, ANN) %>%
+    mutate(Variable = var_name)
+  return(df)
+}
+
+# Carga de archivos desde la ruta D:/Descargas/datos/
+ws10m  <- read_nasa_data("WS10M.csv", "Velocidad del Viento (m/s)")
+prec   <- read_nasa_data("PRECTOTCORR_SUM.csv", "Precipitación (mm)")
+rh2m   <- read_nasa_data("RH2M.csv", "Humedad Relativa (%)")
+t2m    <- read_nasa_data("T2M.csv", "Temperatura (°C)")
+allsky <- read_nasa_data("ALLSKY_SFC_SW_DWN.csv", "Irradiancia Solar (kWh/m2/day)")
+
+# Unir todos los datos
+df_all <- bind_rows(ws10m, prec, rh2m, t2m, allsky)
+```
+# Descripción de los Datos
+
+En este trabajo se analizan variables meteorológicas obtenidas de la plataforma oficial NASA POWER Data Access Viewer, la cual proporciona datos climáticos históricos basados en observaciones satelitales y modelos globales.
+
+Los datos corresponden a la región del Caribe colombiano y fueron descargados utilizando un rectángulo geográfico definido por las siguientes coordenadas:
+
+Latitud inferior: 7° N
+
+Latitud superior: 12.8° N
+
+Longitud izquierda: 77° O
+
+Longitud derecha: 71° O
+
+Esta región cubre aproximadamente la zona costera norte de Colombia, incluyendo áreas cercanas a Barranquilla, La Guajira, Magdalena y partes del Caribe occidental.
+
+NASA POWER limita la descarga a áreas máximas de 10° × 10°, generando cerca de 1,000 puntos de grilla, lo que permite analizar la variabilidad espacial del clima en la región.
+
+Las variables estudiadas incluyen:
+
+Temperatura a 2 m (T2M)
+
+Precipitación total corregida (PRECTOTCORR_SUM)
+
+Humedad relativa a 2 m (RH2M)
+
+Velocidad del viento a 10 m (WS10M)
+
+Irradiancia solar superficial (ALLSKY_SFC_SW_DWN)
+
+Estas variables son fundamentales para el análisis climático regional, estudios de energía solar y eólica, agricultura y evaluación de cambios climáticos en el Caribe colombiano.
+
+
+# Descripción de las Variables Analizadas
+
+En este análisis exploratorio se estudian cinco parámetros clave descargados de NASA POWER para la región del Caribe colombiano:
+
+Temperatura a 2 metros (T2M): Es la temperatura del aire medida a una altura de 2 metros sobre la superficie. Es vital para entender el calentamiento regional y los ciclos térmicos. (Unidad: °C).
+
+Precipitación (PRECTOTCORR_SUM): Suma total de la lluvia corregida por sesgos. Define los periodos de sequía y las temporadas de lluvias. (Unidad: mm).
+
+Humedad Relativa a 2 metros (RH2M): Relación entre la presión parcial del vapor de agua y la presión de vapor de equilibrio a una temperatura dada. (Unidad: %).
+
+Velocidad del Viento a 10 metros (WS10M): Rapidez del viento medida a una altura estándar de 10 metros. Crucial para estudios de energía eólica. (Unidad: m/s).
+
+Irradiancia Solar (ALLSKY_SFC_SW_DWN): Radiación solar de onda corta que llega a la superficie terrestre, considerando tanto el cielo despejado como nublado. (Unidad: kWh/m²/día).
+
+Análisis de Tendencia Histórica
+
+
+# Análisis de Tendencia Histórica (Interanual)
+En esta sección observamos la evolución de las variables a lo largo de las décadas. La línea de tendencia permite identificar si existen patrones de cambio climático local o variaciones significativas en la disponibilidad de recursos (como viento o radiación)
+
+```{r}
+# Calculamos el promedio anual por variable para toda la región
+df_trend <- df_all %>%
+  group_by(YEAR, Variable) %>%
+  summarise(Promedio_Anual = mean(ANN, na.rm = TRUE), .groups = 'drop')
+
+ggplot(df_trend, aes(x = YEAR, y = Promedio_Anual, color = Variable)) +
+  geom_line(linewidth = 1) +
+  geom_smooth(method = "lm", color = "black", linetype = "dashed", se = FALSE, size = 0.5) +
+  facet_wrap(~ Variable, scales = "free_y", ncol = 2) +
+  theme_minimal() +
+  labs(title = "Evolución Interanual (1984 - 2025)",
+       subtitle = "Tendencia lineal marcada en puntos negros",
+       x = "Año", y = "Valor Promedio") +
+  theme(legend.position = "none", 
+        strip.text = element_text(face = "bold", size = 10))
+```
+La gráfica presenta la evolución interanual de cinco variables meteorológicas clave en el Caribe colombiano entre 1984 y 2025, incluyendo temperatura, precipitación, humedad relativa, velocidad del viento e irradiancia solar.
+
+Se observa una tendencia creciente en la temperatura, consistente con el calentamiento global observado en diversas regiones tropicales. La irradiancia solar también muestra un ligero incremento, lo que puede estar relacionado con variaciones en la nubosidad o cambios atmosféricos regionales.
+
+La humedad relativa presenta variaciones moderadas a lo largo del tiempo, con una leve tendencia decreciente, mientras que la precipitación exhibe una alta variabilidad interanual, característica del clima del Caribe colombiano influenciado por fenómenos como El Niño y La Niña.
+
+Por su parte, la velocidad del viento muestra fluctuaciones sin una tendencia clara, indicando estabilidad relativa en este parámetro en la región estudiada.
+
+En conjunto, los resultados sugieren cambios graduales en temperatura e irradiancia solar, junto con variabilidad natural en precipitación y viento, coherente con el comportamiento climático esperado en el Caribe colombiano.
+
+
+# Ciclo Estacional (Mes a Mes)
+
+
+```{r}
+# Transformamos los datos de formato ancho a largo para los meses
+df_seasonal <- df_all %>%
+  select(-ANN) %>%
+  pivot_longer(cols = JAN:DEC, names_to = "Mes", values_to = "Valor") %>%
+  mutate(Mes = factor(Mes, levels = c("JAN", "FEB", "MAR", "APR", "MAY", "JUN", 
+                                      "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"))) %>%
+  group_by(Mes, Variable) %>%
+  summarise(Media_Mensual = mean(Valor, na.rm = TRUE), .groups = 'drop')
+
+ggplot(df_seasonal, aes(x = Mes, y = Media_Mensual, fill = Variable)) +
+  geom_col(alpha = 0.85) +
+  facet_wrap(~ Variable, scales = "free_y", ncol = 2) +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  labs(title = "Comportamiento Estacional Promedio",
+       x = "Mes del Año", y = "Valor Promedio Mensual") +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust = 1))
+```
+La gráfica presenta el promedio mensual de las principales variables meteorológicas en el Caribe colombiano, permitiendo identificar patrones estacionales característicos de la región.
+
+La precipitación muestra un aumento notable entre mayo y noviembre, con picos hacia septiembre y octubre, lo cual coincide con la temporada de lluvias típica del Caribe colombiano. En contraste, los meses de enero a marzo presentan menores niveles de precipitación, correspondientes a la temporada seca.
+
+La humedad relativa sigue un patrón similar al de la precipitación, con valores más altos durante los meses lluviosos y menores en la temporada seca.
+
+La temperatura se mantiene relativamente estable a lo largo del año, reflejando el clima tropical de la región, con ligeras variaciones entre meses.
+
+La irradiancia solar presenta valores mayores durante los meses secos, cuando la nubosidad es menor, y disminuye en la temporada de lluvias.
+
+Por último, la velocidad del viento muestra variaciones moderadas, con valores más altos en los primeros meses del año, posiblemente asociados a los vientos alisios característicos del Caribe.
+
+En conjunto, los resultados reflejan el ciclo climático típico del Caribe colombiano, dominado por una marcada estacionalidad en la precipitación y relativa estabilidad en la temperatura.
+
+
+# Análisis Espacial (Mapas de la Región)
+
+Dado que la zona de estudio abarca desde la zona costera hasta partes más continentales, la distribución geográfica de las variables no es uniforme. Los siguientes mapas muestran el promedio histórico en cada punto de la grilla
+
+
+```{r}
+library(sf)
+library(rnaturalearth)
+library(ggplot2)
+library(viridis)
+library(dplyr)
+
+df_spatial <- df_all %>%
+  group_by(LAT, LON, Variable) %>%
+  summarise(Media_Historica = mean(ANN, na.rm = TRUE), .groups = 'drop')
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+
+variables <- unique(df_spatial$Variable)
+
+for (v in variables) {
+  
+  df_v <- df_spatial %>% filter(Variable == v)
+  
+  print(
+    ggplot() +
+      geom_sf(data = world, fill = "gray95", color = "gray70") +
+      
+      geom_raster(
+        data = df_v,
+        aes(LON, LAT, fill = Media_Historica),
+        alpha = 0.55   # ← opacidad más baja
+      ) +
+      
+      coord_sf(xlim = c(-77, -71), ylim = c(7, 12.8), expand = FALSE) +
+      
+      scale_fill_viridis_c(
+        option = "C",
+        name = v
+      ) +
+      
+      theme_minimal() +
+      labs(
+        title = paste("NASA POWER -", v),
+        subtitle = "Caribe Colombiano"
+      )
+  )
+}
+```
+
+# Distribución Anual de Variables Climáticas
+
+Los boxplots muestran la distribución anual de cada variable climática en la región Caribe colombiana. Se observa la mediana, los cuartiles y posibles valores atípicos, permitiendo evaluar la variabilidad climática y detectar años extremos en temperatura, precipitación, humedad, viento e irradiancia solar.
+
+```{r}
+variables <- unique(df_all$Variable)
+
+for (v in variables) {
+  
+  df_v <- df_all %>% filter(Variable == v)
+  
+  print(
+    ggplot(df_v, aes(x = "", y = ANN)) +
+      geom_boxplot(fill = viridis(1), alpha = 0.7, outlier.color = "red") +
+      theme_minimal() +
+      labs(
+        title = paste("Boxplot -", v),
+        x = "",
+        y = "Valor Anual"
+      )
+  )
+}
+```
+# Boxplot mensual por variable
+
+Los boxplots mensuales permiten analizar el ciclo estacional típico del Caribe colombiano. Se identifican meses secos y lluviosos, así como variaciones en temperatura, humedad, viento e irradiancia solar a lo largo del año.
+
+```{r}
+df_mes <- df_all %>%
+  pivot_longer(JAN:DEC, names_to = "Mes", values_to = "Valor")
+
+for (v in unique(df_mes$Variable)) {
+  
+  df_v <- df_mes %>% filter(Variable == v)
+  
+  print(
+    ggplot(df_v, aes(Mes, Valor)) +
+      geom_boxplot(fill = "orange", alpha = 0.7) +
+      theme_minimal() +
+      labs(title = paste("Distribución mensual -", v),
+           x = "Mes", y = "Valor")
+  )
+}
+```
+
+
+
+# Matriz de Correlación de Variables
+
+La matriz de correlación permite analizar la relación entre temperatura, precipitación, humedad relativa, velocidad del viento e irradiancia solar en la región Caribe colombiana.
+
+Se observa una alta correlación positiva (0.88) entre la humedad relativa y la precipitación, lo cual es consistente con el comportamiento climático de la región, donde los periodos de lluvia están asociados a mayor humedad atmosférica.
+
+También se identifican correlaciones negativas entre temperatura y humedad (-0.71), así como entre irradiancia solar y humedad (-0.52). Esto indica que en días con mayor radiación solar y temperatura, la humedad tiende a disminuir, reflejando condiciones más secas.
+
+La irradiancia solar presenta una correlación moderada positiva con la temperatura (0.47) y con la velocidad del viento (0.53), lo que sugiere que los días más despejados suelen coincidir con mayor radiación y temperaturas más altas.
+
+Por otro lado, la velocidad del viento muestra una correlación casi nula con la temperatura (-0.02), indicando que estos fenómenos son relativamente independientes en la región estudiada.
+
+En general, las correlaciones observadas coinciden con el comportamiento climático esperado en el Caribe colombiano, caracterizado por periodos húmedos con alta precipitación y periodos secos con mayor radiación solar.
+```{r}
+# Preparamos los datos para la matriz
+df_cor <- df_trend %>%
+  pivot_wider(names_from = Variable, values_from = Promedio_Anual) %>%
+  select(-YEAR)
+
+# Calculamos la correlación
+matriz_cor <- cor(df_cor, use = "complete.obs")
+
+# Graficamos
+corrplot(matriz_cor, 
+         method = "ellipse", 
+         type = "upper", 
+         addCoef.col = "black", 
+         number.cex = 0.8,
+         tl.col = "black", 
+         tl.srt = 45,
+         title = "\n\nRelación entre Variables Meteorológicas",
+         mar = c(0,0,1,0))
+```
+
